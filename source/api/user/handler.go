@@ -1,7 +1,9 @@
 package user
 
 import (
+	"app/source/middlewares"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"log"
 	"net/http"
 )
@@ -20,6 +22,9 @@ func (ins *Handle) Apply(r *gin.Engine) {
 	r.POST("/login", ins.login)
 	r.POST("/logout", middlewares.RequireAuth, ins.logout)
 	r.POST("/refresh-token", ins.refreshToken)
+
+	r.POST("/generate", ins.generateOTP)
+	r.p
 }
 
 func (ins *Handle) login(c *gin.Context) {

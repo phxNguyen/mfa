@@ -1,9 +1,10 @@
-package cmd
+package main
 
 import (
-	mfa "app"
-	"app/internal/net"
-	user2 "app/source/api/user"
+	"app"
+	"app/internal/lib/net"
+	"app/internal/mongodb"
+	"app/source/api/user"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"log"
@@ -19,10 +20,10 @@ var (
 
 func init() {
 	//	Open the .env file
-	if err := mfa.LoadEnvironmentVariables("./.env"); err != nil {
+	if err := app.LoadEnvironmentVariables("./.env"); err != nil {
 		log.Fatalf("- LoadEnvironmentVariables error: %s\n", err.Error())
 	}
-	mongoURI, mongoDbName = mfa.GetMongoURI()
+	mongoURI, mongoDbName = app.GetMongoURI()
 
 	bindAddress = app.GetBindAddress()
 	mongoURI, mongoDbName = app.GetMongoURI()
@@ -57,8 +58,8 @@ func main() {
 		MaxAge:           12 * time.Hour,
 	})
 
-	userSvc := user2.NewService()
+	userSvc := user.NewService()
 
-	apiEngine.AddHandler(user2.New(userSvc).Apply)
+	apiEngine.AddHandler(user.New(userSvc).Apply)
 	apiEngine.Run(bindAddress)
 }

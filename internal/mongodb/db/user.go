@@ -1,8 +1,8 @@
 package db
 
 import (
-	"app/internal"
-	"app/internal/db/models"
+	"app/internal/lib/database"
+	"app/internal/mongodb/db/models"
 	"context"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -17,7 +17,7 @@ type User struct {
 
 func NewUser(db *mongo.Database) *User {
 	return &User{
-		co: internal.MongoInit(
+		co: database.MongoInit(
 			db, "users",
 		),
 	}

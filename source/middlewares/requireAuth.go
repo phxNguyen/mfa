@@ -2,6 +2,7 @@ package middlewares
 
 import (
 	"app/internal/auth"
+	"app/internal/mongodb"
 	"app/source/utils"
 	"errors"
 	"github.com/gin-gonic/gin"

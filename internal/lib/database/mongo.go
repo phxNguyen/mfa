@@ -1,7 +1,6 @@
-package internal
+package database
 
 import (
-	"app/internal/db"
 	"context"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -9,28 +8,6 @@ import (
 	"log"
 	"time"
 )
-
-var Conn = new(DB)
-
-type DB struct {
-	Session *db.LoginSession
-	User    *db.User
-}
-
-func (ins *DB) Init(uri, dbName string, timeout time.Duration) {
-	Conn = newConn(uri, dbName, timeout)
-}
-
-func newConn(uri, dbName string, timeout time.Duration) *DB {
-	connection, err := MongoConnect(uri, dbName, timeout)
-	if err != nil {
-		panic(err)
-	}
-	return &DB{
-		db.NewLoginSession(connection),
-		db.NewUser(connection),
-	}
-}
 
 type MongoIndex struct {
 	Keys   interface{}

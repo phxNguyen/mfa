@@ -1,8 +1,8 @@
 package db
 
 import (
-	"app/internal"
-	"app/internal/db/models"
+	"app/internal/lib/database"
+	"app/internal/mongodb/db/models"
 	"context"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -16,7 +16,7 @@ type LoginSession struct {
 
 func NewLoginSession(db *mongo.Database) *LoginSession {
 	return &LoginSession{
-		co: internal.MongoInit(
+		co: database.MongoInit(
 			db,
 			"login_sessions",
 		),
