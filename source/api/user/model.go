@@ -96,3 +96,36 @@ type ChangePasswordResp struct {
 	Code    int    `json:"code"`
 	Message string `json:"message"`
 }
+
+type GenSecretMFAReq struct {
+	trackingData
+}
+
+type GenSecretMFAResp struct {
+	trackingData
+	Code    int       `json:"code"`
+	Message string    `json:"message"`
+	Result  GenSecret `json:"result"`
+}
+
+type GenSecret struct {
+	URI    string `json:"uri"`
+	Issuer string `json:"issuer"`
+	QR     []byte `json:"qr"`
+}
+
+type ValidateOTPReq struct {
+	trackingData
+	OTP string `json:"otp"`
+}
+
+type ActiveMFAReq struct {
+	trackingData
+	OTP string `json:"otp"`
+}
+type DeactivateMFAReq struct {
+	trackingData
+}
+
+type DeactivateMFAResp struct {
+}

@@ -3,10 +3,17 @@ package user
 import (
 	"app/internal/auth"
 	"app/internal/mongodb"
+	"app/internal/mongodb/db/models"
 	"app/source/middlewares"
 	"context"
+	"crypto/rand"
+	"encoding/base32"
 	"errors"
+	"fmt"
+	"github.com/dgryski/dgoogauth"
 	"go.mongodb.org/mongo-driver/mongo"
+	"log"
+	"rsc.io/qr"
 	"time"
 )
 
@@ -23,6 +30,7 @@ func NewService() *Service {
 const (
 	tokenExpired        = 3600 * time.Second
 	refreshTokenExpired = 10 * 24 * time.Hour
+	secretSize          = 10
 )
 
 func (ins *Service) Login(ctx context.Context, request *LogInReq) (*LogInResp, error) {
@@ -129,4 +137,106 @@ func (ins *Service) RefreshToken(ctx context.Context, request *RefreshTokenReq) 
 	}
 	return RefreshTokenResp{request.trackingData,
 		0, "SUCCEED", result}, nil
+}
+
+func (ins *Service) GenerateSecretMFA(ctx context.Context, request *GenSecretMFAReq, uCtx middlewares.UserCtx) (*GenSecretMFAResp, error) {
+
+	secret := genSecret(secretSize)
+	issuer := "WeeDigitalAhihi"
+	// authLink see more at https://github.com/google/google-authenticator/wiki/Key-Uri-Format
+	authLink := fmt.Sprintf("otpauth://totp/%s:%s?secret=%s&issuer=%s", issuer, uCtx.Username, secret, issuer)
+
+	code, err := qr.Encode(authLink, qr.H)
+	if err != nil {
+
+	}
+
+	img := code.PNG()
+
+	err = ins.db.User.UpdateMfaSecret(ctx, uCtx.UUID, secret)
+	if err != nil {
+		return &GenSecretMFAResp{
+			request.trackingData, 1, "DB Err", GenSecret{},
+		}, err
+	}
+
+	return &GenSecretMFAResp{
+		trackingData: request.trackingData,
+		Code:         0,
+		Message:      "",
+		Result: GenSecret{
+			URI:    authLink,
+			Issuer: issuer,
+			QR:     img,
+		},
+	}, nil
+
+}
+
+func (ins *Service) ActivateMFA(ctx context.Context, req *ActiveMFAReq, uCtx middlewares.UserCtx) error {
+
+	user, err := ins.db.User.FindByID(ctx, uCtx.UUID)
+	if err != nil {
+		return err
+	}
+	// see more at https://github.com/dgryski/dgoogauth
+	otpConfig := dgoogauth.OTPConfig{
+		Secret:      user.MFASecret,
+		HotpCounter: 0,
+		WindowSize:  3,
+	}
+
+	valid, err := otpConfig.Authenticate(req.OTP)
+	if err != nil || !valid {
+		log.Printf("ActivateMFA err %s", err)
+		return err
+	}
+	if err := ins.db.User.UpdateMfaActive(ctx, uCtx.UUID, true); err != nil {
+		log.Printf("ActivateMFA err %s", err)
+		return err
+	}
+	return nil
+}
+
+func (ins *Service) ValidateOTP(ctx context.Context, uCtx middlewares.UserCtx, req *ValidateOTPReq) (bool, error) {
+
+	user, err := ins.db.User.FindByID(ctx, uCtx.UUID)
+	if err != nil {
+		log.Printf("ValidateOTP err %s", err)
+		return false, err
+	}
+
+	// see more at https://github.com/dgryski/dgoogauth
+	otpConfig := dgoogauth.OTPConfig{
+		Secret:      user.MFASecret,
+		HotpCounter: 0,
+		WindowSize:  3,
+	}
+
+	valid, err := otpConfig.Authenticate(req.OTP)
+	if err != nil {
+		log.Printf("ValidateOTP err %s", err)
+		return false, err
+	}
+	return valid, nil
+}
+
+func (ins *Service) DeactivateMFA(ctx context.Context, uCtx middlewares.UserCtx) (*models.UserModel, error) {
+	if err := ins.db.User.UpdateMfaSecret(ctx, uCtx.UUID, ""); err != nil {
+		return nil, err
+	}
+	if err := ins.db.User.UpdateMfaActive(ctx, uCtx.UUID, false); err != nil {
+		return nil, err
+	}
+	user, err := ins.db.User.FindByID(ctx, uCtx.UUID)
+	if err != nil {
+		return nil, err
+	}
+	return user, nil
+}
+
+func genSecret(size int) string {
+	data := make([]byte, size)
+	rand.Read(data)
+	return base32.StdEncoding.EncodeToString(data)
 }

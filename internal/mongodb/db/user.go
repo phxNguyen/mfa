@@ -35,6 +35,8 @@ func (ins *User) CreateUser(ctx context.Context, userName string, passWord strin
 	result, err := ins.co.InsertOne(ctx, &models.UserModel{
 		Username:  userName,
 		Password:  passWord,
+		MFAActive: false,
+		MFASecret: "",
 		CreatedAt: time.Now(),
 	})
 	if err != nil {
@@ -122,6 +124,37 @@ func (ins *User) ChangePassword(ctx context.Context, id primitive.ObjectID, pwd 
 		update = bson.M{
 			"$set": bson.M{
 				"password": pwd,
+			},
+		}
+	)
+	_, err := ins.co.UpdateByID(ctx, id, update)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (ins *User) UpdateMfaSecret(ctx context.Context, id primitive.ObjectID, secret string) error {
+	var (
+		update = bson.M{
+			"$set": bson.M{
+				"mfa_secret": secret,
+			},
+		}
+	)
+	_, err := ins.co.UpdateByID(ctx, id, update)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (ins *User) UpdateMfaActive(ctx context.Context, id primitive.ObjectID, active bool) error {
+
+	var (
+		update = bson.M{
+			"$set": bson.M{
+				"mfa_active": active,
 			},
 		}
 	)

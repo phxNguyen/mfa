@@ -23,8 +23,13 @@ func (ins *Handle) Apply(r *gin.Engine) {
 	r.POST("/logout", middlewares.RequireAuth, ins.logout)
 	r.POST("/refresh-token", ins.refreshToken)
 
-	r.POST("/generate", ins.generateOTP)
-	r.p
+	// ins.generateMfaSecret Generates an MFA secret for a user and returns it as a string
+	// and as base64 encoded QR code image.
+	r.POST("/mfa/generate-secret", middlewares.RequireAuth, ins.generateMfaSecret)
+	r.POST("/mfa/active", middlewares.RequireAuth, ins.activeMfa)
+	r.POST("/mfa/validate", middlewares.RequireAuth, ins.validateOTP)
+	r.POST("/mfa/deactivate", middlewares.RequireAuth, ins.deactivateMfa)
+
 }
 
 func (ins *Handle) login(c *gin.Context) {
@@ -94,4 +99,93 @@ func (ins *Handle) refreshToken(c *gin.Context) {
 	} else {
 		c.JSON(http.StatusOK, resp)
 	}
+}
+
+func (ins *Handle) generateMfaSecret(c *gin.Context) {
+	var (
+		userAccess, _ = c.Get(middlewares.KeyUserContextAccess)
+		request       = GenSecretMFAReq{
+			trackingData{
+				c.DefaultQuery("cId", c.Request.UserAgent()),
+				c.DefaultQuery("reqId", uuid.NewString())},
+		}
+	)
+	uCtx := userAccess.(middlewares.UserCtx)
+
+	resp, err := ins.service.GenerateSecretMFA(c.Request.Context(), &request, uCtx)
+	if err != nil {
+		log.Printf("Path: %s, Response: %+v, Error: %s", c.Request.RequestURI, resp, err.Error())
+	}
+	if resp.Code == 41 || resp.Code == 43 {
+		c.JSON(http.StatusUnauthorized, resp)
+	} else {
+		c.JSON(http.StatusOK, resp)
+	}
+}
+
+func (ins *Handle) activeMfa(c *gin.Context) {
+	var (
+		userAccess, _ = c.Get(middlewares.KeyUserContextAccess)
+		request       = ActiveMFAReq{
+			trackingData: trackingData{
+				c.DefaultQuery("cId", c.Request.UserAgent()),
+				c.DefaultQuery("reqId", uuid.NewString())},
+		}
+	)
+	uCtx := userAccess.(middlewares.UserCtx)
+	if err := c.BindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"err": err})
+		return
+	}
+
+	err := ins.service.ActivateMFA(c.Request.Context(), &request, uCtx)
+	if err != nil {
+		log.Printf("Path: %s, Response: %+v, Error: %s", c.Request.RequestURI, err.Error())
+	}
+
+	c.JSON(http.StatusOK, gin.H{"ok": "ok"})
+
+}
+
+func (ins *Handle) validateOTP(c *gin.Context) {
+	var (
+		userAccess, _ = c.Get(middlewares.KeyUserContextAccess)
+		request       = ValidateOTPReq{
+			trackingData: trackingData{
+				c.DefaultQuery("cId", c.Request.UserAgent()),
+				c.DefaultQuery("reqId", uuid.NewString())},
+		}
+	)
+	if err := c.BindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	uCtx := userAccess.(middlewares.UserCtx)
+
+	resp, err := ins.service.ValidateOTP(c.Request.Context(), uCtx, &request)
+	if err != nil {
+		log.Printf("Path: %s, Response: %+v, Error: %s", c.Request.RequestURI, resp, err.Error())
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
+func (ins *Handle) deactivateMfa(c *gin.Context) {
+	var (
+		userAccess, _ = c.Get(middlewares.KeyUserContextAccess)
+		_             = DeactivateMFAReq{
+			trackingData{
+				c.DefaultQuery("cId", c.Request.UserAgent()),
+				c.DefaultQuery("reqId", uuid.NewString())},
+		}
+	)
+	uCtx := userAccess.(middlewares.UserCtx)
+
+	response, err := ins.service.DeactivateMFA(c.Request.Context(), uCtx)
+	if err != nil {
+		log.Printf("Path: %s, Response: %+v, Error: %s", c.Request.RequestURI, err.Error())
+		c.JSON(http.StatusOK, gin.H{"error": err.Error()})
+	}
+
+	c.JSON(http.StatusOK, response)
+
 }
